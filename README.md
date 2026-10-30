@@ -1,238 +1,240 @@
-# FinRecon AI – Intelligent Invoice & Payment Reconciliation Dashboard
+# GRIPHER – Intelligent Financial Reconciliation Platform
+### Hackathon Edition (PS02 – Invoice & Payment Reconciliation)
 
-**FinRecon AI** is a complete, production-grade, local enterprise application designed for intelligent invoice and payment reconciliation, built with **Python 3.11+**, **FastAPI**, **SQLAlchemy**, **SQLite**, **Bootstrap 5**, **Chart.js**, **RapidFuzz**, **PyMuPDF**, **ReportLab**, and **OpenPyXL**.
+**GRIPHER** is a comprehensive, production-grade financial reconciliation platform engineered for Windows 10/11 desktops and enterprise deployment. It automatically matches invoices with bank and payment transactions, detects subtle financial discrepancies and fraud indicators, supports partial and split payments, transparently explains all matching decisions with AI scoring, and generates auditable PDF and Excel reports.
+
+Built with **Python 3.11+ / 3.14**, **PySide6 (Qt for Python)**, **FastAPI**, **SQLAlchemy**, **SQLite**, **RapidFuzz**, **pypdf / PyMuPDF**, **ReportLab**, and **OpenPyXL**.
 
 ---
 
 ## 🌟 Key Features
 
-1. **Enterprise Authentication & Access Control**
-   - Direct `bcrypt` password hashing and secure PyJWT token generation.
-   - Dual-mode authentication: HttpOnly cookie for seamless web browsing and Bearer header for API integration.
-   - Role-Based Access Control (**Admin** and **User/Analyst** roles).
+1. **Native Desktop Experience (`Gripher.exe`)**
+   - Single-click desktop application built with PySide6 and packaged via PyInstaller.
+   - Built-in headless backend lifecycle management: dynamic port allocation, readiness polling, single-instance mutex (`Global\GripherSingleInstanceMutex`), and clean subprocess/thread shutdown.
+   - Per-user writable data directory (`%LOCALAPPDATA%\Gripher`) ensuring database safety when installed in read-only folders (`Program Files`).
 
 2. **Executive Real-time Dashboard**
-   - KPI metrics dynamically calculated from SQLite: Total invoices, Payments received, Outstanding receivables, Reconciliation settlement rate %, Unmatched receipts, Overdue invoices, and Duplicate/Suspicious warnings.
-   - Interactive Chart.js charts:
-     - Monthly Invoice vs Payment comparison
-     - Invoice status distribution (Paid, Partially Paid, Unpaid, Overdue)
-     - Daily bank inflow trends
-     - Top outstanding balances by debtor client
-   - Quick action triggers: 1-click Auto-Reconciliation, Review Queue jump, and recent audit feed.
+   - 8 Operational KPI metrics dynamically calculated from live database records:
+     - Total Invoices Value
+     - Total Payments Received
+     - Successfully Reconciled Amount
+     - Outstanding Invoice Balance
+     - Unmatched Transactions Count
+     - Pending Review Count
+     - Duplicate & Discrepancy Alerts
+     - Reconciliation Rate (%)
+   - Interactive Chart.js analytics: Reconciled vs Unreconciled, Monthly Invoices vs Inflows, Aging Buckets, and Discrepancy Breakdown.
+   - 1-Click Interactive Demo Mode: resets and populates realistic multi-currency test scenarios.
 
-3. **Multi-Format Invoices Ingestion**
-   - Ingest invoices via **CSV**, **Excel (.xlsx, .xls)**, and **PDF** (layout-aware text extraction with PyMuPDF).
-   - Flexible column header alias resolution (e.g., `inv_no`, `Invoice #`, `Total Amount`, `Due Date`).
-   - Automated duplicate-import prevention: skips already recorded invoice numbers and logs duplicate candidates.
-   - Full CRUD: search, filter by date/status, view allocated payments breakdown, and delete safeguards.
+3. **Multi-Format Ingestion Engine**
+   - Invoices: **CSV**, **Excel (.xlsx, .xls)**, and **PDF** (layout-aware text extraction with OCR fallback).
+   - Bank Statements: **CSV** and **Excel** with strict **Credit vs Debit Segregation**.
+   - Debit amounts (bank fees, outgoing transfers) are safely excluded from matching candidates.
+   - Duplicate import detection prevents re-inserting existing invoice numbers or bank transaction IDs.
 
-4. **Payments & Bank Statement Segregation**
-   - Bank statement ingestion (CSV and Excel) with strict **Credit vs Debit Segregation**.
-   - Only incoming receipts (`CREDIT`) are eligible for reconciliation. Outgoing withdrawals, bank service fees, and debit transactions are segregated as `DEBIT (EXCLUDED)` and prevented from accidental allocation.
-   - Duplicate payment detection: flags same customer + same amount + close dates as `"Duplicate payment candidate, needs review"`.
+4. **Intelligent Reconciliation Engine**
+   - **Integer Minor Currency Units (Cents)**: all calculations execute using exact integer cents and Decimal arithmetic, preventing floating-point precision drift.
+   - **Strict Currency Incompatibility Safeguard**: invoices and payments in different currencies (e.g., INR vs USD) are never auto-matched without explicit multi-currency conversion.
+   - **Ambiguity Margin Detection**: when top two matching candidates are within the configured margin threshold, decisions are demoted to human review to prevent erroneous auto-allocation.
+   - **Partial & Split Payment Allocation**:
+     - Multiple payments against one invoice.
+     - Single payment split across multiple invoices.
+     - Overpayment guard strictly prohibiting allocations exceeding remaining balances.
+   - **Multi-tiered Scoring**: Exact references, RapidFuzz entity similarity on customer names, exact amount matching, and proximity date tolerance.
+   - **ACID Database Transactions**: atomic ledger allocation with automatic rollback on collision.
 
-5. **AI Reconciliation Engine**
-   - Multi-tiered strategy scoring:
-     - Exact invoice number and transaction reference extraction
-     - RapidFuzz entity similarity on customer names
-     - Exact amount and remaining balance matching
-     - Date proximity scoring within configurable tolerance window
-   - Configurable normalized confidence score (0–100) using configurable weights.
-   - Classification tiers:
-     - **High** (&ge; 85%): Candidate for automated instant settlement
-     - **Medium** (60% – 84%): Placed in human-in-the-loop Review Queue
-     - **Low** (< 60%): Remains unmatched
-     - **Suspicious**: Overpayment warnings and duplicate candidates flagged for compliance review (never auto-labels fraud; uses `"suspicious, needs review"`)
-   - Advanced financial allocation logic:
-     - **Partial payments**: receipts smaller than invoice balance partially settle invoices.
-     - **Multiple payments per invoice**: successive deposits reduce remaining balance until settled.
-     - **Split payment across invoices**: single lump-sum customer payment split across open customer invoices.
-     - **Overpayment safeguard**: prevents allocating beyond remaining balance.
-   - **ACID Transactions**: all allocations execute within database transactions with automated rollback on error.
-   - Full human explanation generated for every proposed pair.
+5. **Discrepancy & Anomaly Intelligence Center**
+   - Dedicated anomaly engine scanning for:
+     - `DUPLICATE_PAYMENT`: identical amounts, dates, or customer accounts.
+     - `DUPLICATE_INVOICE`: recurring or duplicated invoice claims.
+     - `OVERPAYMENT`: payments exceeding original invoice claims.
+     - `UNMATCHED_PAYMENT`: aged unallocated funds.
+     - `OVERDUE_INVOICE`: unpaid invoices past due dates.
+     - `CURRENCY_MISMATCH`: mismatch between payment and invoice denominations.
+     - `UNUSUAL_AMOUNT`: statistically outlying transactions.
+     - `DATE_INCONSISTENCY`: payment received prior to invoice issuance date.
+   - Resolve, dismiss, or escalate anomalies directly from the dashboard.
 
-6. **Interactive Review Queue**
-   - Filter tabs: Pending Review, High Confidence, Medium Confidence, Suspicious/Alerts, Approved Ledger, and Rejected.
-   - Expandable breakdown showing score points for each criterion, customer similarity ratio, and date variance.
-   - 1-Click Approve, Reject with justification, and Rollback/Unmatch.
-   - **Manual Allocation / Split Modal**: pick an invoice and unallocated payment, enter a custom dollar amount with live preview of new remaining balances.
-   - Bulk approval for high-confidence matches.
+6. **Accounts Receivable Outstanding & Aging Analysis**
+   - Standard 5-tier financial aging schedule:
+     - `Current (Not Due)`
+     - `1 – 30 Days Overdue`
+     - `31 – 60 Days Overdue`
+     - `61 – 90 Days Overdue`
+     - `Over 90 Days (Delinquent)`
+   - Filter by customer, currency, and aging bracket with exportable ledger breakdowns.
 
-7. **Reports & Exports**
-   - **Excel Master Ledger (.xlsx)**: multi-tab formatted workbook using OpenPyXL (Summary, Reconciled Pairs, Unmatched Invoices, Unmatched Payments, Suspicious & Duplicates, and Audit Trail).
-   - **PDF Reports**: generated using ReportLab:
-     - Executive Reconciliation Summary
-     - Unmatched Invoices & Payment Discrepancies
-     - Outstanding Balances by Customer
-     - Suspicious Transactions & Duplicates Audit
+7. **Interactive Human-in-the-Loop Review Queue**
+   - Filter by High Confidence, Medium Confidence, Suspicious/Alerts, Approved, and Rejected.
+   - Detailed justification view showing score breakdown, similarity ratio, and date variance.
+   - 1-Click Approve, Reject with reason, Rollback/Unmatch, or Manual Allocation modal.
 
-8. **Governance & Audit Trail**
-   - Immutable audit logging of all system actions: imports, matches, approvals, rejections, manual allocations, deletes, rollbacks, and settings updates.
+8. **Enterprise Reporting & Exporting**
+   - **Formatted Excel Master Ledger (.xlsx)**: multi-tab workbook with Summary, Reconciled Pairs, Outstanding Invoices, Unmatched Payments, and Audit Trail.
+   - **Vector PDF Financial Reports**: generated via ReportLab with executive tables and charts.
+
+9. **Security, Governance & Audit Trail**
+   - Direct `bcrypt` password hashing and secure PyJWT token generation.
+   - Immutable audit logging for every single action: imports, matches, approvals, rejections, manual splits, and rollbacks.
 
 ---
 
-## 🚀 Step-by-Step Windows Setup Guide
+## 💻 Desktop Application Architecture
 
-### Prerequisites
-- Windows 10 / 11 / Server
-- Python 3.11+ installed and added to `PATH`
-- PowerShell or Windows Command Prompt
-
-### Step 1: Open PowerShell in Project Directory
-```powershell
-cd "c:\Users\B2B LAPP HUB\Desktop\Hackaton\Project"
+```
++-------------------------------------------------------------------+
+|                        GRIPHER.EXE (PySide6)                      |
+|                                                                   |
+|   +-----------------------+     +-------------------------------+ |
+|   |   desktop_run.py      |     |  Single-Instance Mutex Lock   | |
+|   +-----------+-----------+     +-------------------------------+ |
+|               |                                                   |
+|   +-----------v-----------+     +-------------------------------+ |
+|   |  desktop/app.py       |---->|  Dynamic Free Port Allocator  | |
+|   +-----------+-----------+     +-------------------------------+ |
+|               |                                                   |
+|   +-----------v-----------+     +-------------------------------+ |
+|   | desktop/splash.py     |---->|  Splash Screen & Health Check | |
+|   +-----------+-----------+     +-------------------------------+ |
+|               |                                                   |
+|   +-----------v-----------+     +-------------------------------+ |
+|   | desktop/server_thread |---->|  Uvicorn FastAPI Server       | |
+|   +-----------+-----------+     |  (Bound to 127.0.0.1:port)     | |
+|               |                 +---------------+---------------+ |
+|               |                                 |                 |
+|   +-----------v---------------------+           |                 |
+|   | desktop/main_window.py          |           |                 |
+|   | (PySide6 QWebEngineView Window) <-----------+                 |
+|   +---------------------------------+                             |
+|                                                                   |
+|   +-------------------------------------------------------------+ |
+|   | Storage: %LOCALAPPDATA%\Gripher\finrecon.db (ACID SQLite)   | |
++---+-------------------------------------------------------------+-+
 ```
 
-### Step 2: Create and Activate Virtual Environment
+---
+
+## 🚀 Quick Start Guide
+
+### Option 1: Run Pre-Built Executable (`Gripher.exe`)
+1. Download or locate `dist\Gripher\Gripher.exe`.
+2. Double-click `Gripher.exe`.
+3. The splash screen will initialize the backend service, verify the local database, and launch the native desktop window.
+4. Default credentials (or create your own):
+   - **Username**: `admin`
+   - **Password**: `admin123`
+
+---
+
+### Option 2: Run in Development Mode
+Ensure Python 3.11+ is installed.
+
 ```powershell
-# Create virtual environment (if not already created)
+# 1. Clone repository
+git clone https://github.com/dakshcrafts/FinRecon-AI.git
+cd FinRecon-AI
+
+# 2. Run automated dev launcher (creates .venv, installs requirements, launches app)
+.\scripts\run_dev.ps1
+```
+
+Or manually:
+```powershell
 python -m venv .venv
-
-# Activate virtual environment
 .\.venv\Scripts\Activate.ps1
-```
-
-### Step 3: Install Dependencies
-```powershell
 pip install -r requirements.txt
+python desktop_run.py
 ```
 
-### Step 4: Configure Environment Variables
-Copy `.env.example` to `.env` (already created):
-```powershell
-copy .env.example .env
-```
-
-### Step 5: Initialize and Seed Realistic Demo Data
-Run the seeding script to initialize SQLite tables, default users, invoices, bank statements, initial reconciliation matches, and sample test files:
-```powershell
-python seed.py
-```
-
-### Step 6: Run the Pytest Test Suite
-Verify that all reconciliation rules, partial allocations, multiple payments, split payments, overpayment safeguards, debit exclusions, and audit logging pass:
-```powershell
-python -m pytest -v
-```
-
-### Step 7: Launch the Application Server
-Start Uvicorn on localhost:
+To run purely as a local web service (without PySide6 desktop window):
 ```powershell
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-
-Open your browser and navigate to:
-👉 **`http://127.0.0.1:8000`**
+Navigate to `http://127.0.0.1:8000`.
 
 ---
 
-## 🔑 Default Login Credentials
+## 🧪 Automated Test Suite
 
-| Role | Email | Password | Access |
-|---|---|---|---|
-| **Administrator** | `admin@finrecon.ai` | `Admin@123456` | Full access: Engine configuration, weights tuning, approvals, manual allocations, exports, audit trail |
-| **Analyst** | `analyst@finrecon.ai` | `User@123456` | Operations access: Review queue, invoices, payments, manual allocations, report downloads |
+Run the full automated test suite covering unit, parser, reconciliation engine, and desktop smoke tests:
 
-*(Tip: On the login page, click the **"Admin Demo"** or **"Analyst Demo"** buttons to auto-fill credentials instantly!)*
-
----
-
-## 📁 Project Directory Structure
-
-```
-FinReconAI/
-├── app/
-│   ├── models/                  # SQLAlchemy ORM models
-│   │   ├── __init__.py
-│   │   ├── user.py              # User & UserRole (ADMIN, USER)
-│   │   ├── invoice.py           # Invoice & InvoiceStatus
-│   │   ├── payment.py           # Payment, PaymentStatus & TransactionType (CREDIT, DEBIT)
-│   │   ├── reconciliation.py    # ReconciliationMatch & ReconciliationSetting
-│   │   └── audit.py             # AuditLog table
-│   ├── schemas/                 # Pydantic v2 validation models
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── invoice.py
-│   │   ├── payment.py
-│   │   ├── reconciliation.py
-│   │   ├── dashboard.py
-│   │   └── audit.py
-│   ├── services/                # Business logic services
-│   │   ├── auth_service.py      # bcrypt + PyJWT + FastAPI auth dependencies
-│   │   ├── audit_service.py     # Centralized audit logging
-│   │   ├── invoice_parser.py    # CSV, Excel, and PyMuPDF PDF parser
-│   │   ├── payment_parser.py    # Bank statement CSV/Excel with credit/debit filter
-│   │   ├── reconciliation_engine.py # Intelligent multi-pass scoring & allocations
-│   │   └── report_generator.py  # ReportLab PDF & OpenPyXL Excel reports
-│   ├── routers/                 # FastAPI HTTP & API routes
-│   │   ├── auth.py              # Login, Register, Logout, Me
-│   │   ├── dashboard.py         # Dashboard HTML & JSON metrics/charts
-│   │   ├── invoices.py          # Invoices CRUD, search, filter, CSV/Excel/PDF upload
-│   │   ├── payments.py          # Payments CRUD, search, filter, bank statement upload
-│   │   ├── reconciliation.py    # Engine runner, review queue, approve, reject, manual split
-│   │   ├── reports.py           # PDF and Excel downloads
-│   │   ├── settings.py          # Admin weights and thresholds configuration
-│   │   └── audit_logs.py        # Audit trail viewer
-│   ├── templates/               # Jinja2 HTML templates
-│   │   ├── base.html            # Sidebar, topbar, theme, toast notifications
-│   │   ├── login.html           # Branded login card with demo quick-fill
-│   │   ├── register.html        # Registration page
-│   │   ├── dashboard.html       # Executive KPI cards & Chart.js charts
-│   │   ├── invoices.html        # Invoices data table, modal CRUD & import dropzone
-│   │   ├── payments.html        # Payments data table & bank statement upload
-│   │   ├── reconciliation.html  # Engine execution console & rule weights
-│   │   ├── review_queue.html    # Review Queue with criteria accordion & manual split
-│   │   ├── reports.html         # PDF & Excel export center
-│   │   ├── settings.html        # Weight sliders & live preview simulator
-│   │   └── audit_logs.html      # Governance audit trail & JSON inspector
-│   ├── static/                  # Client-side static assets
-│   │   ├── css/custom.css       # Design system tokens, badges, cards, tables
-│   │   └── js/
-│   │       ├── app.js           # Toast alerts, formatting, active nav
-│   │       └── dashboard.js     # Chart.js initialization & auto-refresh
-│   ├── config.py                # Pydantic BaseSettings & configuration
-│   ├── database.py              # SQLite engine, WAL mode, sessionmaker & init_db
-│   └── main.py                  # FastAPI application entry point & lifespan
-├── tests/
-│   ├── test_reconciliation.py   # Unit tests for partial, split, multi, overpayment, debits
-│   └── test_api_and_parsers.py  # Tests for CSV/Excel/PDF parsing & reports
-├── sample_files/                # Auto-generated sample files for testing
-│   ├── sample_invoices_batch.csv
-│   ├── sample_invoices_batch.xlsx
-│   ├── sample_invoice_acme.pdf
-│   ├── sample_bank_statement.csv
-│   └── sample_bank_statement.xlsx
-├── requirements.txt
-├── pytest.ini
-├── .env.example
-├── .env
-├── seed.py
-└── README.md
-```
-
----
-
-## 🧪 Testing Reconciliation Rules
-
-Run the automated test suite anytime with:
 ```powershell
-python -m pytest -v
+.\scripts\run_tests.ps1
 ```
 
-The 11 test cases thoroughly validate:
-- **`test_exact_invoice_match_high_confidence`**: Verifies exact invoice numbers in bank narratives score &ge; 85% and qualify for high-confidence auto-approval.
-- **`test_partial_payment_allocation`**: Verifies that smaller payments partially settle invoice balances, updating invoice status to `PARTIALLY_PAID` and payment to `FULLY_ALLOCATED`.
-- **`test_multiple_payments_single_invoice`**: Verifies two separate installment payments reduce remaining invoice balance to zero and update status to `PAID`.
-- **`test_split_payment_across_invoices`**: Verifies a single lump-sum customer payment splits across multiple open invoices.
-- **`test_overpayment_prevention_and_suspicious_flag`**: Verifies that payments exceeding invoice balances cannot be blindly allocated, raising validation errors and preventing state corruption.
-- **`test_debit_exclusion_rule`**: Verifies that withdrawals, bank fees, and outgoing charges (`DEBIT`) are excluded from reconciliation.
-- **`test_rollback_and_unmatch`**: Verifies that unmatching an allocation reverts invoice and payment balances in an atomic transaction.
-- **`test_audit_log_tracking`**: Verifies that every allocation, approval, and modification writes an immutable audit log.
-- **`test_invoice_csv_import_and_duplicate_prevention`**: Verifies that re-importing the same invoice skips duplicates.
-- **`test_bank_statement_import_credit_debit`**: Verifies statement credit/debit segregation.
-- **`test_report_generation`**: Verifies valid PDF (`%PDF`) and Excel (`PK`) binary file generation.
+Or with `pytest`:
+```powershell
+.\.venv\Scripts\pytest -v tests/
+```
+
+### Test Coverage Highlights:
+- `tests/test_api_and_parsers.py`: Invoices/payments CRUD, CSV/Excel parser alias matching, duplicate checks, audit logging.
+- `tests/test_reconciliation.py`: Exact matching, RapidFuzz tolerance, partial payments, split payments, multi-currency prevention, integer minor cents precision.
+- `tests/test_desktop_smoke.py`: Port allocator, single-instance mutex, database backup and reset, desktop initialization.
 
 ---
 
-## 📄 License
-MIT License. Created for the Financial Reconciliation Hackathon 2026.
+## 🔨 Building the Windows Executable
+
+To build the standalone Windows binary:
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+Verify the build output:
+```powershell
+.\scripts\verify_build.ps1
+```
+
+The output will be generated at:
+`dist\Gripher\Gripher.exe`
+
+---
+
+## 📂 Project Directory Structure
+
+```
+FinRecon-AI/
+├── app/
+│   ├── models/                # SQLAlchemy ORM models (Invoice, Payment, Reconciliation, Anomaly)
+│   ├── routers/               # FastAPI route controllers (Dashboard, Review, Discrepancies, etc.)
+│   ├── schemas/               # Pydantic validation schemas
+│   ├── services/              # Core domain logic
+│   │   ├── reconciliation_engine.py  # Precision integer-cent AI matching engine
+│   │   ├── anomaly_service.py        # Discrepancy and fraud detection rules
+│   │   ├── outstanding_service.py    # Accounts receivable aging schedule
+│   │   ├── invoice_parser.py         # CSV, Excel, PDF parser with pure-python fallback
+│   │   ├── payment_parser.py         # Bank statement credit/debit segregation
+│   │   ├── report_service.py         # Excel and PDF report generation
+│   │   └── audit_service.py          # Compliance audit trail
+│   ├── static/                # CSS (dark fintech theme), JS, Chart.js, icons
+│   ├── templates/             # Jinja2 HTML templates
+│   ├── database.py            # SQLite connection, migration, backup, demo-reset
+│   └── main.py                # FastAPI app initialization
+├── desktop/                   # Native PySide6 Desktop Shell
+│   ├── app.py                 # Application lifecycle, mutex, port allocation
+│   ├── splash.py              # Splash screen with server health polling
+│   ├── server_thread.py       # Controlled Uvicorn background thread
+│   └── main_window.py         # PySide6 desktop window (QWebEngineView)
+├── packaging/
+│   └── gripher.spec           # PyInstaller build specification
+├── sample_data/               # Realistic invoices, bank statements, and edge cases
+├── scripts/
+│   ├── run_dev.ps1            # Development runner
+│   ├── run_tests.ps1          # Automated test execution
+│   ├── build_windows.ps1      # PyInstaller packaging script
+│   └── verify_build.ps1       # Executable verification script
+├── tests/                     # Automated unit and integration test suite
+├── desktop_run.py             # Desktop launcher entry point
+├── requirements.txt           # Python package dependencies
+└── README.md                  # Comprehensive documentation
+```
+
+---
+
+## 👥 Hackathon Team & Acknowledgements
+- **Team**: FinRecon AI / Gripher Team
+- **Problem Statement**: PS02 – Intelligent Financial Reconciliation
+- **Repository**: [https://github.com/dakshcrafts/FinRecon-AI](https://github.com/dakshcrafts/FinRecon-AI)
