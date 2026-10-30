@@ -16,3 +16,4 @@ if (-not (Test-Path $pythonExe)) {
 
 Write-Host "Using Python: $pythonExe" -ForegroundColor Green
 & $pythonExe desktop_run.py
+

@@ -21,3 +21,4 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "`nTests encountered failures (Exit code: $LASTEXITCODE)" -ForegroundColor Red
     exit $LASTEXITCODE
 }
+

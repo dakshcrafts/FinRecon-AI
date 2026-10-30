@@ -49,3 +49,4 @@ def stage_and_commit():
 
 if __name__ == "__main__":
     stage_and_commit()
+

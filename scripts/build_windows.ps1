@@ -27,3 +27,4 @@ if (Test-Path $outputExe) {
     Write-Host "`nBuild failed: $outputExe not found." -ForegroundColor Red
     exit 1
 }
+

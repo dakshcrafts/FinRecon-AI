@@ -29,3 +29,4 @@ if (Test-Path $templatesDir) {
 }
 
 Write-Host "`nGripher.exe verification passed!" -ForegroundColor Green
+
