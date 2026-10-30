@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Dashboard{% endblock %}
+{% block page_title %}Reconciliation Executive Dashboard{% endblock %}
+
+{% block topbar_actions %}
+<a href="/invoices" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+    <i class="bi bi-file-earmark-plus me-1"></i> Invoices
+</a>
+<a href="/payments" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+    <i class="bi bi-bank me-1"></i> Bank Payments
+</a>
+<a href="/reconciliation/review" class="btn btn-primary btn-sm rounded-pill px-3 position-relative">
+    <i class="bi bi-inbox-fill me-1"></i> Review Queue
+    {% if pending_review_count > 0 %}
+    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+        {{ pending_review_count }}
+    </span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Top 8 Summary Cards: Operating Metrics Directly from Database -->
+<div class="row g-3 mb-4">
+    <!-- 1. Total Invoices -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">1. Total Invoice Value</div>
+                    <div class="stat-value" id="metricTotalInvoicesAmount">$0.00</div>
+                    <div class="stat-subtext"><span id="metricTotalInvoicesCount">0</span> invoices recorded</div>
+                </div>
+                <div class="card-icon icon-indigo">
+                    <i class="bi bi-receipt-cutoff"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Payments Received -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">2. Payments Received</div>
+                    <div class="stat-value" id="metricTotalPaymentsAmount">$0.00</div>
+                    <div class="stat-subtext"><span id="metricTotalPaymentsCount">0</span> credits ingested</div>
+                </div>
+                <div class="card-icon icon-emerald">
+                    <i class="bi bi-cash-coin"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Successfully Reconciled Amount -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">3. Reconciled Amount</div>
+                    <div class="stat-value text-success" id="metricReconciledAmount">$0.00</div>
+                    <div class="stat-subtext">Approved allocations ledger</div>
+                </div>
+                <div class="card-icon icon-emerald">
+                    <i class="bi bi-check2-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Outstanding Balance -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">4. Outstanding Balance</div>
+                    <div class="stat-value text-danger" id="metricOutstandingAmount">$0.00</div>
+                    <div class="stat-subtext"><span id="metricOverdueCount" class="fw-bold text-danger">0</span> overdue invoices</div>
+                </div>
+                <div class="card-icon icon-rose">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- 5. Unmatched Transactions -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">5. Unmatched Bank Receipts</div>
+                    <div class="stat-value text-warning" id="metricUnmatchedCount">0</div>
+                    <div class="stat-subtext"><span id="metricUnmatchedAmount">$0.00</span> unallocated</div>
+                </div>
+                <div class="card-icon icon-amber">
+                    <i class="bi bi-question-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Pending Review Queue -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">6. Pending Review</div>
+                    <div class="stat-value text-primary" id="metricPendingReviewCount">0</div>
+                    <div class="stat-subtext">Matches requiring analyst review</div>
+                </div>
+                <div class="card-icon icon-sky">
+                    <i class="bi bi-inbox-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. Duplicate & Discrepancy Alerts -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">7. Discrepancy Alerts</div>
+                    <div class="stat-value text-danger" id="metricDuplicateCount">0</div>
+                    <div class="stat-subtext">Risk indicators detected</div>
+                </div>
+                <div class="card-icon icon-rose">
+                    <i class="bi bi-exclamation-octagon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. Reconciliation Rate -->
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">8. Reconciliation Rate</div>
+                    <div class="stat-value text-primary" id="metricReconRate">0.0%</div>
+                    <div class="progress mt-2" style="height: 6px; width: 140px;">
+                        <div id="reconProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="card-icon icon-sky">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+    <!-- Chart 1: Monthly Invoices vs Payments -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Invoices vs Payments Comparison</h5>
+                <span class="badge bg-light text-secondary">Last 6 Months</span>
+            </div>
+            <div style="height: 300px; position: relative;">
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 2: Status Distribution -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Invoice Status Distribution</h5>
+            </div>
+            <div style="height: 300px; position: relative;">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 3: Payment Inflow Trend -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Bank Inflow Trend</h5>
+                <span class="badge bg-light text-secondary">Recent Transactions</span>
+            </div>
+            <div style="height: 260px; position: relative;">
+                <canvas id="paymentTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 4: Top Outstanding Receivables -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Top Outstanding Receivables by Client</h5>
+                <span class="badge bg-light text-secondary">Highest Balance</span>
+            </div>
+            <div style="height: 260px; position: relative;">
+                <canvas id="topCustomersChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & Audit Logs -->
+<div class="card border-0 shadow-sm bg-white rounded-3">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="fw-bold mb-1">Recent Reconciliation & Audit Events</h5>
+            <p class="text-muted small mb-0">Real-time immutable log of allocations, imports, and system adjustments</p>
+        </div>
+        <a href="/audit-logs" class="btn btn-sm btn-link text-decoration-none fw-semibold">View Full Audit Log &rarr;</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_audits %}
+                    <tr>
+                        <td class="ps-4 text-muted small">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            <span class="fw-semibold small">{{ log.user.email if log.user else 'System Engine' }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary-subtle text-secondary">{{ log.action }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ log.entity_type }}</span>
+                        </td>
+                        <td class="small">{{ log.description }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No audit events recorded yet. Run reconciliation or import statements to begin.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings{% endblock %}
+{% block page_title %}Reconciliation Engine Configuration{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3">
+            <h5 class="fw-bold mb-1">Reconciliation Scoring Weights</h5>
+            <p class="text-muted small mb-4">
+                Define the relative importance of matching criteria. 
+                Weights are normalized so that scores range between 0 and 100. Total must sum to 100%.
+            </p>
+
+            <form id="settingsForm" onsubmit="handleSaveSettings(event)">
+                <!-- Invoice # Weight -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0">Invoice Number Identification Weight</label>
+                        <span class="badge bg-primary fs-6" id="valWeightInv">{{ setting.weight_invoice_number }}%</span>
+                    </div>
+                    <input type="range" class="form-range" id="inputWeightInv" min="0" max="100" step="1" value="{{ setting.weight_invoice_number }}" oninput="updateWeightSum()">
+                    <div class="text-muted" style="font-size: 0.75rem;">Points awarded when invoice number appears in bank description or reference.</div>
+                </div>
+
+                <!-- Customer Name Weight -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0">Customer Name Similarity Weight (RapidFuzz)</label>
+                        <span class="badge bg-info fs-6" id="valWeightCust">{{ setting.weight_customer_name }}%</span>
+                    </div>
+                    <input type="range" class="form-range" id="inputWeightCust" min="0" max="100" step="1" value="{{ setting.weight_customer_name }}" oninput="updateWeightSum()">
+                    <div class="text-muted" style="font-size: 0.75rem;">Fuzzy string ratio and token sorting score between counterparty names.</div>
+                </div>
+
+                <!-- Amount Weight -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0">Amount / Balance Match Weight</label>
+                        <span class="badge bg-success fs-6" id="valWeightAmt">{{ setting.weight_amount }}%</span>
+                    </div>
+                    <input type="range" class="form-range" id="inputWeightAmt" min="0" max="100" step="1" value="{{ setting.weight_amount }}" oninput="updateWeightSum()">
+                    <div class="text-muted" style="font-size: 0.75rem;">Exact match on remaining balance or original invoice total.</div>
+                </div>
+
+                <!-- Date Proximity Weight -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0">Date Proximity Weight</label>
+                        <span class="badge bg-warning text-dark fs-6" id="valWeightDate">{{ setting.weight_date_proximity }}%</span>
+                    </div>
+                    <input type="range" class="form-range" id="inputWeightDate" min="0" max="100" step="1" value="{{ setting.weight_date_proximity }}" oninput="updateWeightSum()">
+                    <div class="text-muted" style="font-size: 0.75rem;">Scores proximity between bank payment date and invoice issue or due dates.</div>
+                </div>
+
+                <!-- Total Sum Badge -->
+                <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center mb-4">
+                    <span class="fw-bold small">Total Combined Weight:</span>
+                    <span class="badge fs-6" id="totalWeightBadge">100%</span>
+                </div>
+
+                <hr class="my-4">
+
+                <h5 class="fw-bold mb-1">Classification Thresholds</h5>
+                <p class="text-muted small mb-3">Control when matches are automatically approved versus placed in the human review queue.</p>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Auto-Match High Threshold (%)</label>
+                        <input type="number" class="form-control" id="inputAutoThreshold" value="{{ setting.auto_match_threshold }}" min="50" max="100" step="1" required>
+                        <small class="text-muted">Matches with score &ge; this value qualify for auto-approval.</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Review Queue Medium Threshold (%)</label>
+                        <input type="number" class="form-control" id="inputReviewThreshold" value="{{ setting.review_queue_threshold }}" min="10" max="90" step="1" required>
+                        <small class="text-muted">Matches below this value remain unmatched.</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Date Tolerance Window (Days)</label>
+                        <input type="number" class="form-control" id="inputDateTolerance" value="{{ setting.date_tolerance_days }}" min="1" max="180" step="1" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Ambiguity Margin Gap (%)</label>
+                        <input type="number" class="form-control" id="inputAmbiguityMargin" value="{{ setting.ambiguity_margin or 5.0 }}" min="0" max="30" step="0.5" required>
+                        <small class="text-muted">Competitor matches within this margin route to Review Queue.</small>
+                    </div>
+
+                    <div class="col-md-12 d-flex align-items-center pt-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="inputAutoMatchEnabled" {% if setting.auto_match_enabled %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold small" for="inputAutoMatchEnabled">Enable Automated Execution Policy</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary px-4" id="btnSaveSettings">
+                    <i class="bi bi-save me-1"></i> Save Configuration
+                </button>
+            </form>
+        </div>
+
+        <!-- Database Safety & Demo State Card -->
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 mt-4">
+            <h5 class="fw-bold mb-1"><i class="bi bi-shield-check text-success me-2"></i>Database Backups & Demo Reset</h5>
+            <p class="text-muted small mb-3">Safely archive local data or restore the clean hackathon demo dataset.</p>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="triggerBackup()" id="btnBackup">
+                    <i class="bi bi-hdd-down me-1"></i> Backup Database Now
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="triggerResetDemo()" id="btnResetDemo">
+                    <i class="bi bi-arrow-repeat me-1"></i> Reset Demo Dataset (with Auto-Backup)
+                </button>
+            </div>
+            <div id="backupFeedback" class="small text-muted mt-2"></div>
+        </div>
+    </div>
+
+    <!-- Live Preview Simulator -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <h5 class="fw-bold mb-1">Scoring Simulator</h5>
+            <p class="text-muted small mb-4">Test match simulation using current weights.</p>
+
+            <div class="mb-3">
+                <label class="form-label small">Invoice # detected?</label>
+                <select class="form-select form-select-sm" id="simInv" onchange="runSim()">
+                    <option value="1.0">Exact match (100%)</option>
+                    <option value="0.85">Core number found (85%)</option>
+                    <option value="0.0" selected>Not found (0%)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small">Customer Name match</label>
+                <select class="form-select form-select-sm" id="simCust" onchange="runSim()">
+                    <option value="1.0">Exact name match (100%)</option>
+                    <option value="0.85" selected>Fuzzy match (85%)</option>
+                    <option value="0.5">Weak match (50%)</option>
+                    <option value="0.0">No match (0%)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small">Amount match</label>
+                <select class="form-select form-select-sm" id="simAmt" onchange="runSim()">
+                    <option value="1.0" selected>Exact amount (100%)</option>
+                    <option value="0.7">Partial payment (70%)</option>
+                    <option value="0.0">Different amount (0%)</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label small">Date proximity</label>
+                <select class="form-select form-select-sm" id="simDate" onchange="runSim()">
+                    <option value="1.0" selected>Within 7 days (100%)</option>
+                    <option value="0.6">Within tolerance (60%)</option>
+                    <option value="0.0">Exceeds tolerance (0%)</option>
+                </select>
+            </div>
+
+            <div class="p-3 bg-light rounded-3 text-center">
+                <div class="text-muted small">Simulated Confidence Score</div>
+                <h2 class="fw-bold my-1" id="simScore">0.0%</h2>
+                <div id="simTier" class="badge-status badge-tier-medium mt-1">MEDIUM CONFIDENCE</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateWeightSum() {
+    const inv = parseInt(document.getElementById('inputWeightInv').value);
+    const cust = parseInt(document.getElementById('inputWeightCust').value);
+    const amt = parseInt(document.getElementById('inputWeightAmt').value);
+    const date = parseInt(document.getElementById('inputWeightDate').value);
+
+    document.getElementById('valWeightInv').textContent = `${inv}%`;
+    document.getElementById('valWeightCust').textContent = `${cust}%`;
+    document.getElementById('valWeightAmt').textContent = `${amt}%`;
+    document.getElementById('valWeightDate').textContent = `${date}%`;
+
+    const total = inv + cust + amt + date;
+    const badge = document.getElementById('totalWeightBadge');
+    badge.textContent = `${total}%`;
+
+    if (total === 100) {
+        badge.className = 'badge bg-success fs-6';
+    } else {
+        badge.className = 'badge bg-danger fs-6';
+    }
+
+    runSim();
+}
+
+function runSim() {
+    const wInv = parseFloat(document.getElementById('inputWeightInv').value);
+    const wCust = parseFloat(document.getElementById('inputWeightCust').value);
+    const wAmt = parseFloat(document.getElementById('inputWeightAmt').value);
+    const wDate = parseFloat(document.getElementById('inputWeightDate').value);
+
+    const sInv = parseFloat(document.getElementById('simInv').value) * wInv;
+    const sCust = parseFloat(document.getElementById('simCust').value) * wCust;
+    const sAmt = parseFloat(document.getElementById('simAmt').value) * wAmt;
+    const sDate = parseFloat(document.getElementById('simDate').value) * wDate;
+
+    const totW = wInv + wCust + wAmt + wDate;
+    const score = totW > 0 ? ((sInv + sCust + sAmt + sDate) / totW) * 100 : 0;
+
+    const autoThresh = parseFloat(document.getElementById('inputAutoThreshold').value);
+    const revThresh = parseFloat(document.getElementById('inputReviewThreshold').value);
+
+    document.getElementById('simScore').textContent = `${score.toFixed(1)}%`;
+    const tierEl = document.getElementById('simTier');
+
+    if (score >= autoThresh) {
+        tierEl.className = 'badge-status badge-tier-high mt-1';
+        tierEl.textContent = 'HIGH (AUTO-MATCH)';
+    } else if (score >= revThresh) {
+        tierEl.className = 'badge-status badge-tier-medium mt-1';
+        tierEl.textContent = 'MEDIUM (REVIEW QUEUE)';
+    } else {
+        tierEl.className = 'badge-status badge-tier-low mt-1';
+        tierEl.textContent = 'LOW (UNMATCHED)';
+    }
+}
+
+async function handleSaveSettings(e) {
+    e.preventDefault();
+    const inv = parseFloat(document.getElementById('inputWeightInv').value);
+    const cust = parseFloat(document.getElementById('inputWeightCust').value);
+    const amt = parseFloat(document.getElementById('inputWeightAmt').value);
+    const date = parseFloat(document.getElementById('inputWeightDate').value);
+
+    if (inv + cust + amt + date !== 100) {
+        showToast('Weights must sum to exactly 100%', 'error');
+        return;
+    }
+
+    const payload = {
+        weight_invoice_number: inv,
+        weight_customer_name: cust,
+        weight_amount: amt,
+        weight_date_proximity: date,
+        auto_match_threshold: parseFloat(document.getElementById('inputAutoThreshold').value),
+        review_queue_threshold: parseFloat(document.getElementById('inputReviewThreshold').value),
+        ambiguity_margin: parseFloat(document.getElementById('inputAmbiguityMargin').value || 5.0),
+        date_tolerance_days: parseInt(document.getElementById('inputDateTolerance').value),
+        auto_match_enabled: document.getElementById('inputAutoMatchEnabled').checked
+    };
+
+    const btn = document.getElementById('btnSaveSettings');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    try {
+        const res = await fetch('/api/settings/reconciliation', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Settings saved successfully', 'success');
+        } else {
+            showToast(data.detail || 'Failed to save settings', 'error');
+        }
+    } catch (err) {
+        showToast('Error saving settings', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-save me-1"></i> Save Configuration';
+    }
+}
+
+async function triggerBackup() {
+    const btn = document.getElementById('btnBackup');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Backing up...';
+    try {
+        const res = await fetch('/api/settings/backup', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Database backup saved successfully', 'success');
+            document.getElementById('backupFeedback').innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Backup saved: <code>${data.backup_path}</code></span>`;
+        } else {
+            showToast(data.detail || 'Backup failed', 'error');
+        }
+    } catch (err) {
+        showToast('Backup failed: ' + err, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-hdd-down me-1"></i> Backup Database Now';
+    }
+}
+
+async function triggerResetDemo() {
+    if (!confirm('This will create a backup of current data and restore the clean hackathon demo dataset. Continue?')) {
+        return;
+    }
+    const btn = document.getElementById('btnResetDemo');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Resetting...';
+    try {
+        const res = await fetch('/api/settings/reset-demo', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Demo dataset restored successfully', 'success');
+            document.getElementById('backupFeedback').innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.message} Safety backup: <code>${data.backup_path}</code></span>`;
+        } else {
+            showToast(data.detail || 'Reset failed', 'error');
+        }
+    } catch (err) {
+        showToast('Reset failed: ' + err, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Reset Demo Dataset (with Auto-Backup)';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateWeightSum();
+});
+</script>
+{% endblock %}

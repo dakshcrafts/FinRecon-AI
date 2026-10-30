@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Management{% endblock %}
+{% block page_title %}Invoice Management{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#importInvoiceModal">
+    <i class="bi bi-file-earmark-arrow-up me-1"></i> Import Invoices (CSV/Excel/PDF)
+</button>
+<button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#createInvoiceModal">
+    <i class="bi bi-plus-lg me-1"></i> New Invoice
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Filter Toolbar -->
+<div class="card border-0 shadow-sm p-3 bg-white rounded-3 mb-4">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by invoice #, customer name...">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select id="statusFilter" class="form-select">
+                <option value="ALL">All Statuses</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="PARTIALLY_PAID">Partially Paid</option>
+                <option value="PAID">Paid</option>
+                <option value="OVERDUE">Overdue</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" id="startDateFilter" class="form-control" title="Start Date">
+        </div>
+        <div class="col-md-2">
+            <input type="date" id="endDateFilter" class="form-control" title="End Date">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button class="btn btn-light border w-100" onclick="resetFilters()">Reset</button>
+            <a href="/api/invoices/sample-template" class="btn btn-light border" title="Download Sample CSV Template">
+                <i class="bi bi-download"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Invoices Data Table -->
+<div class="custom-table-container">
+    <div class="table-responsive">
+        <table class="table custom-table" id="invoicesTable">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Customer Name</th>
+                    <th>Invoice Date</th>
+                    <th>Due Date</th>
+                    <th>Total</th>
+                    <th>Paid</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="invoicesTableBody">
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Loading invoices...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+        <span class="small text-muted" id="paginationInfo">Showing 0 of 0</span>
+        <div class="d-flex gap-1" id="paginationControls"></div>
+    </div>
+</div>
+
+<!-- Modal: Create Single Invoice -->
+<div class="modal fade" id="createInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-receipt me-2 text-primary"></i>Create New Invoice</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createInvoiceForm" onsubmit="handleCreateInvoice(event)">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Invoice Number *</label>
+                            <input type="text" name="invoice_number" class="form-control" placeholder="e.g. INV-2026-101" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Customer / Client Name *</label>
+                            <input type="text" name="customer_name" class="form-control" placeholder="e.g. Acme Corporation" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Customer Email</label>
+                            <input type="email" name="customer_email" class="form-control" placeholder="billing@acme.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Currency</label>
+                            <input type="text" name="currency" class="form-control" value="USD" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Invoice Issue Date *</label>
+                            <input type="date" name="invoice_date" id="newInvoiceDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Payment Due Date *</label>
+                            <input type="date" name="due_date" id="newDueDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Total Amount ($) *</label>
+                            <input type="number" step="0.01" min="0.01" name="total_amount" class="form-control" placeholder="1000.00" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Tax Amount ($)</label>
+                            <input type="number" step="0.01" min="0" name="tax_amount" class="form-control" value="0.00">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Description / Line Items</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="Services rendered, contract reference..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnSubmitInvoice">Save Invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Import Invoices (CSV / Excel / PDF) -->
+<div class="modal fade" id="importInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cloud-arrow-up me-2 text-primary"></i>Import Invoices</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">
+                    Upload your invoice spreadsheet (CSV, Excel .xlsx) or single/batch PDF invoices. 
+                    Duplicates are automatically detected and skipped to maintain ledger integrity.
+                </p>
+                <div class="dropzone mb-3" id="invoiceDropzone" onclick="document.getElementById('invoiceFileInput').click()">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    <h6 class="fw-bold mb-1">Click to browse or drag file here</h6>
+                    <small class="text-muted">Supports .csv, .xlsx, .xls, .pdf</small>
+                    <div id="selectedInvoiceFileName" class="mt-2 fw-semibold text-primary"></div>
+                </div>
+                <input type="file" id="invoiceFileInput" class="d-none" accept=".csv,.xlsx,.xls,.pdf" onchange="handleFileSelect(this)">
+                
+                <div id="importResultAlert" class="d-none alert py-2 px-3 small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4" id="btnStartImport" onclick="submitInvoiceImport()">Upload & Parse</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Invoice Details & Match History -->
+<div class="modal fade" id="invoiceDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="detailInvoiceTitle">Invoice Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="invoiceDetailBody">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+const limit = 50;
+
+async function fetchInvoices() {
+    const search = document.getElementById('searchInput').value;
+    const status = document.getElementById('statusFilter').value;
+    const startDate = document.getElementById('startDateFilter').value;
+    const endDate = document.getElementById('endDateFilter').value;
+
+    let url = `/api/invoices?page=${currentPage}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status && status !== 'ALL') url += `&status=${status}`;
+    if (startDate) url += `&start_date=${startDate}`;
+    if (endDate) url += `&end_date=${endDate}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        renderInvoices(data);
+    } catch (err) {
+        console.error(err);
+        showToast('Failed to load invoices', 'error');
+    }
+}
+
+function renderInvoices(data) {
+    const tbody = document.getElementById('invoicesTableBody');
+    if (!data.items || data.items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No invoices found matching criteria.</td></tr>';
+        document.getElementById('paginationInfo').textContent = 'Showing 0 of 0';
+        return;
+    }
+
+    document.getElementById('paginationInfo').textContent = `Showing ${data.items.length} of ${data.total} invoices`;
+
+    tbody.innerHTML = data.items.map(inv => {
+        let badgeClass = 'badge-unpaid';
+        if (inv.status === 'PAID') badgeClass = 'badge-paid';
+        else if (inv.status === 'PARTIALLY_PAID') badgeClass = 'badge-partial';
+        else if (inv.status === 'OVERDUE') badgeClass = 'badge-overdue';
+
+        return `
+            <tr>
+                <td>
+                    <div class="fw-bold">${inv.invoice_number}</div>
+                    <small class="text-muted"><i class="bi bi-tag me-1"></i>${inv.import_source}</small>
+                </td>
+                <td>
+                    <div class="fw-semibold">${inv.customer_name}</div>
+                    <small class="text-muted">${inv.customer_email || 'No email'}</small>
+                </td>
+                <td>${formatDate(inv.invoice_date)}</td>
+                <td>${formatDate(inv.due_date)}</td>
+                <td class="fw-bold">${formatCurrency(inv.total_amount, inv.currency)}</td>
+                <td class="text-success">${formatCurrency(inv.paid_amount, inv.currency)}</td>
+                <td class="fw-bold ${inv.remaining_amount > 0 ? 'text-danger' : 'text-muted'}">
+                    ${formatCurrency(inv.remaining_amount, inv.currency)}
+                </td>
+                <td>
+                    <span class="badge-status ${badgeClass}">
+                        ${inv.status.replace('_', ' ')}
+                    </span>
+                </td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-light border me-1" onclick="viewInvoiceDetail(${inv.id})" title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light border text-danger" onclick="deleteInvoice(${inv.id}, '${inv.invoice_number}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function handleCreateInvoice(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = document.getElementById('btnSubmitInvoice');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+    payload.total_amount = parseFloat(payload.total_amount);
+    payload.tax_amount = parseFloat(payload.tax_amount || 0);
+
+    try {
+        const res = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (res.ok) {
+            showToast(`Invoice ${result.invoice_number} created successfully`, 'success');
+            form.reset();
+            bootstrap.Modal.getInstance(document.getElementById('createInvoiceModal')).hide();
+            fetchInvoices();
+        } else {
+            showToast(result.detail || 'Failed to create invoice', 'error');
+        }
+    } catch (err) {
+        showToast('Error creating invoice', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Save Invoice';
+    }
+}
+
+async function viewInvoiceDetail(id) {
+    try {
+        const res = await fetch(`/api/invoices/${id}`);
+        const data = await res.json();
+        const inv = data.invoice;
+        const matches = data.matches;
+
+        document.getElementById('detailInvoiceTitle').textContent = `Invoice #${inv.invoice_number} Details`;
+        document.getElementById('invoiceDetailBody').innerHTML = `
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="text-muted small">Customer / Client</div>
+                        <h6 class="fw-bold mb-1">${inv.customer_name}</h6>
+                        <small class="text-muted">${inv.customer_email || 'No email'}</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="text-muted small">Financial Summary</div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Total:</span> <span class="fw-bold">${formatCurrency(inv.total_amount)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1 text-success">
+                            <span>Paid:</span> <span>${formatCurrency(inv.paid_amount)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-danger fw-bold">
+                            <span>Remaining:</span> <span>${formatCurrency(inv.remaining_amount)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold mb-3"><i class="bi bi-link-45deg me-1"></i>Reconciled Payment Allocations</h6>
+            ${matches.length === 0 ? '<p class="text-muted small">No payment receipts allocated to this invoice yet.</p>' : `
+                <div class="table-responsive">
+                    <table class="table table-sm border align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Payment Ref</th>
+                                <th>Date</th>
+                                <th>Allocated ($)</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                                <th>Strategy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${matches.map(m => `
+                                <tr>
+                                    <td class="fw-bold">${m.payment_ref}</td>
+                                    <td>${m.payment_date}</td>
+                                    <td class="text-success fw-bold">${formatCurrency(m.allocated_amount)}</td>
+                                    <td><span class="badge bg-primary-subtle text-primary">${m.confidence_score}%</span></td>
+                                    <td><span class="badge bg-light text-dark border">${m.status}</span></td>
+                                    <td class="small">${m.strategy}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        `;
+
+        new bootstrap.Modal(document.getElementById('invoiceDetailModal')).show();
+    } catch (err) {
+        showToast('Error loading details', 'error');
+    }
+}
+
+async function deleteInvoice(id, invNum) {
+    if (!confirm(`Are you sure you want to delete invoice ${invNum}? This action is logged.`)) return;
+
+    try {
+        const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            fetchInvoices();
+        } else {
+            showToast(data.detail || 'Delete failed', 'error');
+        }
+    } catch (err) {
+        showToast('Error deleting invoice', 'error');
+    }
+}
+
+function handleFileSelect(input) {
+    if (input.files && input.files[0]) {
+        document.getElementById('selectedInvoiceFileName').textContent = `Selected: ${input.files[0].name} (${(input.files[0].size/1024).toFixed(1)} KB)`;
+    }
+}
+
+async function submitInvoiceImport() {
+    const fileInput = document.getElementById('invoiceFileInput');
+    if (!fileInput.files || !fileInput.files[0]) {
+        showToast('Please select a file to upload', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btnStartImport');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Parsing...';
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    const alertEl = document.getElementById('importResultAlert');
+    alertEl.className = 'd-none';
+
+    try {
+        const res = await fetch('/api/invoices/import', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        alertEl.classList.remove('d-none');
+        if (res.ok) {
+            alertEl.className = 'alert alert-success py-2 px-3 small';
+            alertEl.innerHTML = `<strong>Success!</strong> ${data.message}`;
+            showToast(data.message, 'success');
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('importInvoiceModal')).hide();
+                fetchInvoices();
+            }, 1500);
+        } else {
+            alertEl.className = 'alert alert-danger py-2 px-3 small';
+            alertEl.innerHTML = `<strong>Error:</strong> ${data.detail || 'Import failed'}`;
+        }
+    } catch (err) {
+        alertEl.classList.remove('d-none');
+        alertEl.className = 'alert alert-danger py-2 px-3 small';
+        alertEl.innerHTML = 'Network error during file upload';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Upload & Parse';
+    }
+}
+
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('statusFilter').value = 'ALL';
+    document.getElementById('startDateFilter').value = '';
+    document.getElementById('endDateFilter').value = '';
+    currentPage = 1;
+    fetchInvoices();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Set default dates for create modal
+    const today = new Date().toISOString().split('T')[0];
+    const in30Days = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
+    document.getElementById('newInvoiceDate').value = today;
+    document.getElementById('newDueDate').value = in30Days;
+
+    document.getElementById('searchInput').addEventListener('input', () => {
+        currentPage = 1;
+        fetchInvoices();
+    });
+    document.getElementById('statusFilter').addEventListener('change', () => {
+        currentPage = 1;
+        fetchInvoices();
+    });
+    document.getElementById('startDateFilter').addEventListener('change', fetchInvoices);
+    document.getElementById('endDateFilter').addEventListener('change', fetchInvoices);
+
+    fetchInvoices();
+});
+</script>
+{% endblock %}

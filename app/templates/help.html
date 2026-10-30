@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Help & About | {{ app_name }}{% endblock %}
+{% block page_title %}Help, Architecture & Documentation{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <!-- Overview Card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-icon bg-primary text-white rounded-3 p-3 me-3">
+                        <i class="bi bi-shield-lock-fill fs-3"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold mb-0">{{ app_name }}</h3>
+                        <p class="text-muted mb-0">{{ app_tagline }} &bull; Version {{ app_version }}</p>
+                    </div>
+                </div>
+                <p class="lead fs-6 text-secondary">
+                    <strong>Gripher</strong> is an enterprise-grade financial reconciliation platform engineered for <strong>PS02 — Invoice & Payment Reconciliation</strong>. 
+                    It operates 100% locally with zero cloud leakage, resolving multi-invoice splits, partial settlements, duplicate candidates, and mathematical discrepancies with explainable auditability.
+                </p>
+            </div>
+        </div>
+
+        <!-- Reconciliation Engine Guide -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-cpu-fill text-primary me-2"></i>Multi-Pass Matching Architecture</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="timeline">
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary mb-1">Pass 1: Direct 1-to-1 Deterministic Matching</h6>
+                        <p class="small text-muted mb-0">
+                            Extracts exact invoice reference tokens from transaction narratives, computes RapidFuzz normalized Levenshtein ratios on customer names, verifies date proximity within configurable tolerance windows, and checks exact unallocated amounts with integer-cent minor currency precision.
+                        </p>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary mb-1">Ambiguity Margin Protection</h6>
+                        <p class="small text-muted mb-0">
+                            If two competing payments score within the ambiguity margin (&le; 5.0%), the engine demotes the match to <em>Medium Confidence</em> and routes it to the human-in-the-loop Review Queue, preventing accidental misallocation.
+                        </p>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary mb-1">Pass 2: Partial & Split Settlement Intelligence</h6>
+                        <p class="small text-muted mb-0">
+                            Receipts smaller than open invoice balances are allocated partially without balance loss. Single lump-sum payments spanning multiple invoices for the same customer are systematically decomposed across open accounts.
+                        </p>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-primary mb-1">Pass 3: Rule-Based Anomaly & Risk Detection</h6>
+                        <p class="small text-muted mb-0">
+                            Flags identical deposits within 14 days as duplicate candidates, isolates credit vs debit withdrawals, prevents allocations beyond remaining balances, and detects severe invoice aging risks.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Local Data & Privacy -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-hdd-network-fill text-success me-2"></i>Data Privacy & Offline Security</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="small text-muted mb-2">
+                    Gripher is designed with local-first financial sovereignty. All ledger balances, audit trails, and parsing pipelines run locally without sending unencrypted data to external third parties.
+                </p>
+                <ul class="small text-muted mb-0">
+                    <li><strong>Database Engine:</strong> SQLite 3 in WAL mode with Foreign Key integrity constraints.</li>
+                    <li><strong>Security Layer:</strong> Bcrypt password hashing, local JWT authorization, and parameterized SQL operations.</li>
+                    <li><strong>Network Binding:</strong> Bound strictly to <code>127.0.0.1</code> to prevent network exposure.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Info Sidebar -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-info-circle me-2"></i>System Environment</h6>
+            </div>
+            <div class="card-body p-3">
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Application Name</span>
+                        <strong>{{ app_name }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Target Platform</span>
+                        <strong>Windows 10 / 11 64-bit</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Desktop Shell</span>
+                        <strong>PySide6 (Qt)</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span class="text-muted">Backend Service</span>
+                        <strong>FastAPI & Uvicorn</strong>
+                    </li>
+                    <li class="list-group-item px-0">
+                        <span class="text-muted d-block">Writable Data Directory:</span>
+                        <code class="small text-break">{{ data_dir }}</code>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-file-earmark-arrow-down me-2"></i>Sample Templates</h6>
+            </div>
+            <div class="card-body p-3">
+                <p class="small text-muted mb-3">Download formatted CSV sample templates to test batch imports:</p>
+                <div class="d-grid gap-2">
+                    <a href="/sample_files/sample_invoices_batch.csv" download class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-filetype-csv me-2 text-primary"></i> Sample Invoices CSV
+                    </a>
+                    <a href="/sample_files/sample_bank_statement.csv" download class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-filetype-csv me-2 text-success"></i> Sample Bank Statement CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

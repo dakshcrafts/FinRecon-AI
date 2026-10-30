@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}AI Reconciliation Engine{% endblock %}
+{% block page_title %}AI Reconciliation Engine{% endblock %}
+
+{% block topbar_actions %}
+<a href="/reconciliation/review" class="btn btn-primary btn-sm rounded-pill px-3">
+    <i class="bi bi-inbox-fill me-1"></i> Open Review Queue
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Operations Execution Card -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="card-icon icon-indigo mb-0">
+                    <i class="bi bi-cpu-fill"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">Intelligent Matching Pipeline</h5>
+                    <small class="text-muted">Automated multi-strategy reconciliation and confidence scoring</small>
+                </div>
+            </div>
+
+            <p class="text-secondary small mb-4">
+                The FinRecon AI engine cross-references open invoice balances against incoming bank statement deposits using configurable weighted criteria, fuzzy customer entity resolution (RapidFuzz), and date proximity analysis.
+            </p>
+
+            <div class="bg-light p-3 rounded-3 mb-4">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="checkAutoApproveHigh" checked>
+                    <label class="form-check-label fw-semibold small" for="checkAutoApproveHigh">
+                        Auto-approve High Confidence matches (Score &ge; {{ setting.auto_match_threshold }}%)
+                    </label>
+                    <div class="text-muted" style="font-size: 0.75rem;">Immediately commits ledger allocations for exact reference and amount matches.</div>
+                </div>
+
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="checkReEvaluateAll">
+                    <label class="form-check-label fw-semibold small" for="checkReEvaluateAll">
+                        Re-evaluate existing proposed matches
+                    </label>
+                    <div class="text-muted" style="font-size: 0.75rem;">Clears any unconfirmed proposals and recalculates matching scores.</div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-primary px-4 py-2" id="btnExecuteEngine" onclick="runEnginePipeline()">
+                    <i class="bi bi-play-circle-fill me-2"></i> Run AI Reconciliation Pipeline
+                </button>
+                <span id="engineStatusSpinner" class="d-none text-muted small">
+                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span>Evaluating strategies...
+                </span>
+            </div>
+
+            <div id="engineResultBox" class="mt-4 d-none">
+                <div class="alert alert-success p-3 rounded-3 mb-0">
+                    <div class="fw-bold mb-1" id="engineResultTitle">Execution Completed</div>
+                    <div class="small" id="engineResultDetails"></div>
+                    <div class="mt-2">
+                        <a href="/reconciliation/review" class="btn btn-sm btn-success fw-semibold">View in Review Queue &rarr;</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Rule Weights Card -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Configured Scoring Weights</h5>
+                {% if current_user.role == 'ADMIN' %}
+                <a href="/settings" class="btn btn-sm btn-link text-decoration-none">Tune &rarr;</a>
+                {% endif %}
+            </div>
+
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                    <span><i class="bi bi-tag me-1 text-primary"></i>Invoice # Match:</span>
+                    <span class="text-primary">{{ setting.weight_invoice_number }}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-primary" style="width: {{ setting.weight_invoice_number }}%"></div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                    <span><i class="bi bi-person me-1 text-info"></i>Customer Name (RapidFuzz):</span>
+                    <span class="text-info">{{ setting.weight_customer_name }}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-info" style="width: {{ setting.weight_customer_name }}%"></div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                    <span><i class="bi bi-currency-dollar me-1 text-success"></i>Amount / Balance Match:</span>
+                    <span class="text-success">{{ setting.weight_amount }}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" style="width: {{ setting.weight_amount }}%"></div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                    <span><i class="bi bi-calendar me-1 text-warning"></i>Date Proximity (&plusmn;{{ setting.date_tolerance_days }}d):</span>
+                    <span class="text-warning">{{ setting.weight_date_proximity }}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-warning" style="width: {{ setting.weight_date_proximity }}%"></div>
+                </div>
+            </div>
+
+            <div class="p-3 bg-light rounded-3 mt-4 small">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Auto-Match Threshold:</span>
+                    <span class="badge bg-success-subtle text-success">&ge; {{ setting.auto_match_threshold }}%</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Review Queue Threshold:</span>
+                    <span class="badge bg-warning-subtle text-warning">&ge; {{ setting.review_queue_threshold }}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Strategy Architecture Grid -->
+<h5 class="fw-bold mb-3">Reconciliation Engine Strategies</h5>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary p-2"><i class="bi bi-search"></i></span>
+                <h6 class="fw-bold mb-0">Exact Identification</h6>
+            </div>
+            <p class="text-muted small mb-0">Detects exact invoice numbers and reference tokens inside bank transaction narratives.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-info-subtle text-info p-2"><i class="bi bi-pie-chart"></i></span>
+                <h6 class="fw-bold mb-0">Partial Settlements</h6>
+            </div>
+            <p class="text-muted small mb-0">Supports multi-installment payments where a receipt partially settles an outstanding invoice balance.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-warning-subtle text-warning p-2"><i class="bi bi-diagram-3"></i></span>
+                <h6 class="fw-bold mb-0">Split Across Invoices</h6>
+            </div>
+            <p class="text-muted small mb-0">Distributes a single lump-sum customer payment across multiple open invoices in order of maturity.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-danger-subtle text-danger p-2"><i class="bi bi-shield-slash"></i></span>
+                <h6 class="fw-bold mb-0">Overpayment Safeguards</h6>
+            </div>
+            <p class="text-muted small mb-0">Prevents blind over-allocation beyond remaining balance. Flags surplus as suspicious for analyst review.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-secondary-subtle text-secondary p-2"><i class="bi bi-files"></i></span>
+                <h6 class="fw-bold mb-0">Duplicate Detection</h6>
+            </div>
+            <p class="text-muted small mb-0">Flags identical references or matching amounts and dates within 48h as duplicate candidates.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-success-subtle text-success p-2"><i class="bi bi-database-lock"></i></span>
+                <h6 class="fw-bold mb-0">Atomic ACID Transactions</h6>
+            </div>
+            <p class="text-muted small mb-0">All ledger mutations execute inside database transactions with automated rollback on any validation failure.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runEnginePipeline() {
+    const btn = document.getElementById('btnExecuteEngine');
+    const spinner = document.getElementById('engineStatusSpinner');
+    const resultBox = document.getElementById('engineResultBox');
+
+    btn.disabled = true;
+    spinner.classList.remove('d-none');
+    resultBox.classList.add('d-none');
+
+    const autoApprove = document.getElementById('checkAutoApproveHigh').checked;
+    const reEvaluate = document.getElementById('checkReEvaluateAll').checked;
+
+    try {
+        const res = await fetch('/api/reconciliation/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                auto_approve_high: autoApprove,
+                re_evaluate_all: reEvaluate
+            })
+        });
+        const data = await res.json();
+
+        spinner.classList.add('d-none');
+        btn.disabled = false;
+
+        if (res.ok) {
+            resultBox.classList.remove('d-none');
+            document.getElementById('engineResultTitle').textContent = `Pipeline Completed Successfully`;
+            document.getElementById('engineResultDetails').innerHTML = `
+                <div><strong>Total Matches Generated:</strong> ${data.data.matches_generated}</div>
+                <div><strong>Auto-Approved (High Confidence):</strong> ${data.data.auto_approved_count}</div>
+                <div><strong>Pending in Review Queue (Medium Confidence):</strong> ${data.data.review_queue_count}</div>
+                <div><strong>Suspicious / Duplicate Flags:</strong> ${data.data.suspicious_count}</div>
+            `;
+            showToast('Reconciliation engine finished successfully', 'success');
+        } else {
+            showToast(data.detail || 'Reconciliation failed', 'error');
+        }
+    } catch (err) {
+        spinner.classList.add('d-none');
+        btn.disabled = false;
+        showToast('Network error during engine execution', 'error');
+    }
+}
+</script>
+{% endblock %}

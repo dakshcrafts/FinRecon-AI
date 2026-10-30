@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}Payments & Bank Statements{% endblock %}
+{% block page_title %}Payments & Bank Statements{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#importPaymentModal">
+    <i class="bi bi-bank me-1"></i> Import Bank Statement (CSV/Excel)
+</button>
+<button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#createPaymentModal">
+    <i class="bi bi-plus-lg me-1"></i> Record Payment
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Info Alert: Credit vs Debit segregation rule -->
+<div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-4 rounded-3 border-0 bg-info-subtle text-info-emphasis">
+    <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+    <div>
+        <strong>Segregation Policy:</strong> Only incoming receipts (<code>CREDIT</code>) are eligible for invoice reconciliation.
+        Withdrawals, fees, and vendor charges are segregated as <code>DEBIT (EXCLUDED)</code> and protected from accidental allocation.
+    </div>
+</div>
+
+<!-- Filter Toolbar -->
+<div class="card border-0 shadow-sm p-3 bg-white rounded-3 mb-4">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-3">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="paymentSearchInput" class="form-control border-start-0 ps-0" placeholder="Search reference, customer, narrative...">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select id="typeFilter" class="form-select">
+                <option value="ALL">All Types</option>
+                <option value="CREDIT" selected>Incoming Receipts (Credit)</option>
+                <option value="DEBIT">Withdrawals (Debit - Excluded)</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select id="paymentStatusFilter" class="form-select">
+                <option value="ALL">All Statuses</option>
+                <option value="UNMATCHED">Unmatched</option>
+                <option value="PARTIALLY_ALLOCATED">Partially Allocated</option>
+                <option value="FULLY_ALLOCATED">Fully Allocated</option>
+                <option value="SUSPICIOUS">Suspicious / Duplicate</option>
+                <option value="EXCLUDED">Excluded (Debits)</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" id="payStartDate" class="form-control" title="Start Date">
+        </div>
+        <div class="col-md-2">
+            <input type="date" id="payEndDate" class="form-control" title="End Date">
+        </div>
+        <div class="col-md-1 d-flex gap-1">
+            <button class="btn btn-light border w-100" onclick="resetPaymentFilters()">Reset</button>
+            <a href="/api/payments/sample-template" class="btn btn-light border" title="Download Sample Bank CSV">
+                <i class="bi bi-download"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Payments Data Table -->
+<div class="custom-table-container">
+    <div class="table-responsive">
+        <table class="table custom-table" id="paymentsTable">
+            <thead>
+                <tr>
+                    <th>Reference #</th>
+                    <th>Customer / Remitter</th>
+                    <th>Date</th>
+                    <th>Amount ($)</th>
+                    <th>Allocated</th>
+                    <th>Unallocated</th>
+                    <th>Type</th>
+                    <th>Status & Flags</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="paymentsTableBody">
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Loading payment transactions...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+        <span class="small text-muted" id="payPaginationInfo">Showing 0 of 0</span>
+    </div>
+</div>
+
+<!-- Modal: Record Single Payment Receipt -->
+<div class="modal fade" id="createPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-wallet2 me-2 text-primary"></i>Record Manual Payment Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createPaymentForm" onsubmit="handleCreatePayment(event)">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Transaction Reference *</label>
+                            <input type="text" name="transaction_reference" class="form-control" placeholder="e.g. TXN-WIRE-9081" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Customer / Payer Name</label>
+                            <input type="text" name="customer_name" class="form-control" placeholder="e.g. Acme Corporation">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Payment Date *</label>
+                            <input type="date" name="payment_date" id="newPayDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Transaction Type *</label>
+                            <select name="transaction_type" class="form-select">
+                                <option value="CREDIT">CREDIT (Incoming Receipt - Eligible)</option>
+                                <option value="DEBIT">DEBIT (Withdrawal / Charge - Excluded)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Amount ($) *</label>
+                            <input type="number" step="0.01" min="0.01" name="amount" class="form-control" placeholder="5000.00" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Payment Method</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Wire Transfer">Wire Transfer</option>
+                                <option value="ACH">ACH Direct Deposit</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Check">Check / Cheque</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Bank Narrative / Description</label>
+                            <textarea name="bank_description" class="form-control" rows="2" placeholder="e.g. Payment for INV-2026-001 by Acme Corp"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" id="btnSubmitPayment">Save Receipt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Import Bank Statement -->
+<div class="modal fade" id="importPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-bank me-2 text-primary"></i>Import Bank Statement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">
+                    Upload your raw bank statement (CSV or Excel). Debits and bank fees will automatically be detected and excluded. 
+                    Duplicate transactions will be safely flagged.
+                </p>
+                <div class="dropzone mb-3" id="payDropzone" onclick="document.getElementById('statementFileInput').click()">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <h6 class="fw-bold mb-1">Click to browse or drag statement file</h6>
+                    <small class="text-muted">Supports .csv, .xlsx, .xls</small>
+                    <div id="selectedStatementFileName" class="mt-2 fw-semibold text-primary"></div>
+                </div>
+                <input type="file" id="statementFileInput" class="d-none" accept=".csv,.xlsx,.xls" onchange="handleStatementFile(this)">
+                
+                <div id="payImportResultAlert" class="d-none alert py-2 px-3 small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4" id="btnStartStatementImport" onclick="submitStatementImport()">Process Statement</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Payment Details & Allocation -->
+<div class="modal fade" id="paymentDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="detailPayTitle">Payment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="paymentDetailBody">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let payPage = 1;
+
+async function fetchPayments() {
+    const search = document.getElementById('paymentSearchInput').value;
+    const status = document.getElementById('paymentStatusFilter').value;
+    const type = document.getElementById('typeFilter').value;
+    const start = document.getElementById('payStartDate').value;
+    const end = document.getElementById('payEndDate').value;
+
+    let url = `/api/payments?page=${payPage}&limit=50`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status && status !== 'ALL') url += `&status=${status}`;
+    if (type && type !== 'ALL') url += `&type=${type}`;
+    if (start) url += `&start_date=${start}`;
+    if (end) url += `&end_date=${end}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        renderPayments(data);
+    } catch (err) {
+        showToast('Failed to load payments', 'error');
+    }
+}
+
+function renderPayments(data) {
+    const tbody = document.getElementById('paymentsTableBody');
+    if (!data.items || data.items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No transactions found matching criteria.</td></tr>';
+        document.getElementById('payPaginationInfo').textContent = 'Showing 0 of 0';
+        return;
+    }
+
+    document.getElementById('payPaginationInfo').textContent = `Showing ${data.items.length} of ${data.total} transactions`;
+
+    tbody.innerHTML = data.items.map(p => {
+        const isDebit = p.transaction_type === 'DEBIT';
+        const isSusp = p.is_suspicious || p.is_duplicate;
+
+        let statusBadge = `<span class="badge bg-light text-dark border">${p.status}</span>`;
+        if (p.status === 'FULLY_ALLOCATED') statusBadge = '<span class="badge bg-success-subtle text-success">FULLY ALLOCATED</span>';
+        else if (p.status === 'PARTIALLY_ALLOCATED') statusBadge = '<span class="badge bg-warning-subtle text-warning">PARTIALLY ALLOCATED</span>';
+        else if (p.status === 'EXCLUDED') statusBadge = '<span class="badge bg-secondary-subtle text-secondary">EXCLUDED (DEBIT)</span>';
+
+        if (isSusp) {
+            statusBadge += `<br><span class="badge bg-danger-subtle text-danger mt-1" title="${p.suspicion_reason || 'Suspicious transaction'}"><i class="bi bi-exclamation-triangle me-1"></i>Suspicious, Needs Review</span>`;
+        }
+
+        return `
+            <tr class="${isSusp ? 'table-warning' : ''}">
+                <td>
+                    <div class="fw-bold">${p.transaction_reference}</div>
+                    <small class="text-muted">${p.payment_method}</small>
+                </td>
+                <td>
+                    <div class="fw-semibold">${p.customer_name || '<span class="text-muted fst-italic">Unknown Originator</span>'}</div>
+                    <small class="text-muted text-truncate d-inline-block" style="max-width: 220px;" title="${p.bank_description || ''}">${p.bank_description || 'No narrative'}</small>
+                </td>
+                <td>${formatDate(p.payment_date)}</td>
+                <td class="fw-bold ${isDebit ? 'text-danger' : 'text-success'}">
+                    ${isDebit ? '-' : '+'}${formatCurrency(p.amount, p.currency)}
+                </td>
+                <td class="text-primary">${formatCurrency(p.allocated_amount, p.currency)}</td>
+                <td class="fw-bold ${p.unallocated_amount > 0 ? 'text-warning' : 'text-muted'}">
+                    ${formatCurrency(p.unallocated_amount, p.currency)}
+                </td>
+                <td>
+                    <span class="badge ${isDebit ? 'bg-danger text-white' : 'bg-success text-white'}">
+                        ${p.transaction_type}
+                    </span>
+                </td>
+                <td>${statusBadge}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-light border me-1" onclick="viewPaymentDetail(${p.id})" title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light border text-danger" onclick="deletePayment(${p.id}, '${p.transaction_reference}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function handleCreatePayment(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = document.getElementById('btnSubmitPayment');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+    payload.amount = parseFloat(payload.amount);
+
+    try {
+        const res = await fetch('/api/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (res.ok) {
+            showToast(`Payment ${result.transaction_reference} saved successfully`, 'success');
+            form.reset();
+            bootstrap.Modal.getInstance(document.getElementById('createPaymentModal')).hide();
+            fetchPayments();
+        } else {
+            showToast(result.detail || 'Failed to save payment', 'error');
+        }
+    } catch (err) {
+        showToast('Error saving payment', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Save Receipt';
+    }
+}
+
+async function viewPaymentDetail(id) {
+    try {
+        const res = await fetch(`/api/payments/${id}`);
+        const data = await res.json();
+        const p = data.payment;
+        const matches = data.matches;
+
+        document.getElementById('detailPayTitle').textContent = `Payment #${p.transaction_reference} Details`;
+        document.getElementById('paymentDetailBody').innerHTML = `
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="text-muted small">Payer Information</div>
+                        <h6 class="fw-bold mb-1">${p.customer_name || 'N/A'}</h6>
+                        <small class="text-muted">Method: ${p.payment_method}</small>
+                        <div class="mt-2 small text-secondary"><strong>Narrative:</strong> ${p.bank_description || 'None'}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3">
+                        <div class="text-muted small">Allocation Ledger</div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Total Amount:</span> <span class="fw-bold">${formatCurrency(p.amount)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1 text-success">
+                            <span>Allocated:</span> <span>${formatCurrency(p.allocated_amount)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-warning fw-bold">
+                            <span>Unallocated Balance:</span> <span>${formatCurrency(p.unallocated_amount)}</span>
+                        </div>
+                        ${p.is_suspicious ? `<div class="alert alert-danger p-2 small mt-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>${p.suspicion_reason}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold mb-3"><i class="bi bi-link-45deg me-1"></i>Settled Invoices</h6>
+            ${matches.length === 0 ? '<p class="text-muted small">No invoices currently settled by this payment receipt.</p>' : `
+                <div class="table-responsive">
+                    <table class="table table-sm border align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Allocated ($)</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${matches.map(m => `
+                                <tr>
+                                    <td class="fw-bold">${m.invoice_number}</td>
+                                    <td>${m.customer}</td>
+                                    <td class="text-success fw-bold">${formatCurrency(m.allocated_amount)}</td>
+                                    <td><span class="badge bg-primary-subtle text-primary">${m.confidence_score}%</span></td>
+                                    <td><span class="badge bg-light text-dark border">${m.status}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        `;
+
+        new bootstrap.Modal(document.getElementById('paymentDetailModal')).show();
+    } catch (err) {
+        showToast('Error loading details', 'error');
+    }
+}
+
+async function deletePayment(id, ref) {
+    if (!confirm(`Are you sure you want to delete payment ${ref}? This action is recorded in the audit trail.`)) return;
+
+    try {
+        const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            fetchPayments();
+        } else {
+            showToast(data.detail || 'Delete failed', 'error');
+        }
+    } catch (err) {
+        showToast('Error deleting payment', 'error');
+    }
+}
+
+function handleStatementFile(input) {
+    if (input.files && input.files[0]) {
+        document.getElementById('selectedStatementFileName').textContent = `Selected: ${input.files[0].name} (${(input.files[0].size/1024).toFixed(1)} KB)`;
+    }
+}
+
+async function submitStatementImport() {
+    const fileInput = document.getElementById('statementFileInput');
+    if (!fileInput.files || !fileInput.files[0]) {
+        showToast('Please select a bank statement file to upload', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btnStartStatementImport');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    const alertEl = document.getElementById('payImportResultAlert');
+    alertEl.className = 'd-none';
+
+    try {
+        const res = await fetch('/api/payments/import', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        alertEl.classList.remove('d-none');
+        if (res.ok) {
+            alertEl.className = 'alert alert-success py-2 px-3 small';
+            alertEl.innerHTML = `<strong>Success!</strong> ${data.message}`;
+            showToast(data.message, 'success');
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('importPaymentModal')).hide();
+                fetchPayments();
+            }, 1800);
+        } else {
+            alertEl.className = 'alert alert-danger py-2 px-3 small';
+            alertEl.innerHTML = `<strong>Error:</strong> ${data.detail || 'Import failed'}`;
+        }
+    } catch (err) {
+        alertEl.classList.remove('d-none');
+        alertEl.className = 'alert alert-danger py-2 px-3 small';
+        alertEl.innerHTML = 'Network error during upload';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Process Statement';
+    }
+}
+
+function resetPaymentFilters() {
+    document.getElementById('paymentSearchInput').value = '';
+    document.getElementById('paymentStatusFilter').value = 'ALL';
+    document.getElementById('typeFilter').value = 'CREDIT';
+    document.getElementById('payStartDate').value = '';
+    document.getElementById('payEndDate').value = '';
+    payPage = 1;
+    fetchPayments();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('newPayDate').value = new Date().toISOString().split('T')[0];
+
+    document.getElementById('paymentSearchInput').addEventListener('input', () => {
+        payPage = 1;
+        fetchPayments();
+    });
+    document.getElementById('paymentStatusFilter').addEventListener('change', () => {
+        payPage = 1;
+        fetchPayments();
+    });
+    document.getElementById('typeFilter').addEventListener('change', () => {
+        payPage = 1;
+        fetchPayments();
+    });
+    document.getElementById('payStartDate').addEventListener('change', fetchPayments);
+    document.getElementById('payEndDate').addEventListener('change', fetchPayments);
+
+    fetchPayments();
+});
+</script>
+{% endblock %}
