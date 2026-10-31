@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2027,50:203a43,100:2c9f7b&height=200&section=header&text=FinRecon%20AI&fontSize=60&fontColor=ffffff&animation=fadeIn&fontAlignY=38&desc=Intelligent%20Invoice%20%26%20Payment%20Reconciliation%20Dashboard&descAlignY=60&descSize=18" alt="FinRecon AI banner"/>
+<img src="uploads/banner.svg" alt="FinRecon AI banner" width="100%"/>
 
 [![Hackathon Project](https://img.shields.io/badge/Hackathon-ARCHITHON%202026-ff6b6b?style=for-the-badge)](#-hackathon)
 [![AI Powered](https://img.shields.io/badge/AI-Powered%20Matching-2c9f7b?style=for-the-badge)](#-how-it-works)
@@ -238,7 +238,9 @@ Output binary:
 
 ```
 FinRecon-AI/
-├── uploads/                   # Screenshots & demonstration video
+├── uploads/                   # Banner, footer, screenshots & demonstration video
+│   ├── banner.svg
+│   ├── footer.svg
 │   ├── Dashboard Overview.png
 │   ├── Mismatch Review.png
 │   ├── Reconciliation Result.png
@@ -299,9 +301,9 @@ Built at **ARCHITHON** by **Team Griphers** · Theme: FinTech / AI (PS02 – Inv
 | Member | Role | GitHub |
 |---|---|---|
 | **Daksh Sharma** | 👑 Team Leader | [@dakshcrafts](https://github.com/dakshcrafts) |
+| **Sachin** | Team Member | [@sharmasachinbharadwaj-del](https://github.com/sharmasachinbharadwaj-del) |
+| **Rohan** | Team Member | [@rohan78950-debug](https://github.com/rohan78950-debug) |
 | **Diya** | Team Member | — |
-| **Sachin** | Team Member | — |
-| **Rohan** | Team Member | — |
 
 ---
 
@@ -309,6 +311,6 @@ Built at **ARCHITHON** by **Team Griphers** · Theme: FinTech / AI (PS02 – Inv
 
 ⭐ If you find FinRecon AI useful, please consider giving it a star on GitHub!
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:2c9f7b,100:0f2027&height=100&section=footer" alt="FinRecon AI footer"/>
+<img src="uploads/footer.svg" alt="FinRecon AI footer" width="100%"/>
 
 </div>
