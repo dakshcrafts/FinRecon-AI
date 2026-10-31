@@ -30,7 +30,6 @@ htmlcov/
 *.db-shm
 secret.key
 gripher.lock
-uploads/
 generated_reports/
 backups/
 
