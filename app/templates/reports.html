@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Reports & Exports{% endblock %}
+{% block page_title %}Financial Reports & Reconciliation Exports{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Excel Master Ledger Card -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="card-icon icon-emerald mb-0">
+                        <i class="bi bi-file-earmark-excel-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold mb-1">Comprehensive Reconciliation Excel Ledger</h5>
+                        <p class="text-muted small mb-0">Multi-sheet styled workbook containing Executive Summary, Reconciled Pairs, Unmatched Invoices, Unmatched Payments, and Audit Trail.</p>
+                    </div>
+                </div>
+                <a href="/api/reports/excel" class="btn btn-success px-4 py-2 fw-semibold">
+                    <i class="bi bi-download me-2"></i> Download Excel (.xlsx)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Report Options -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-start gap-3">
+                <div class="card-icon icon-indigo">
+                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold mb-1">Executive Reconciliation Summary</h5>
+                    <p class="text-muted small mb-3">High-level financial overview featuring total invoiced volume, payments received, settlement ratios, and outstanding receivables.</p>
+                    <a href="/api/reports/pdf/summary" target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-file-pdf me-1"></i> Generate PDF Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-start gap-3">
+                <div class="card-icon icon-amber">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold mb-1">Unmatched Items & Variances</h5>
+                    <p class="text-muted small mb-3">Itemized ledger of outstanding open invoices and unallocated bank receipts requiring reviewer attention.</p>
+                    <a href="/api/reports/pdf/unmatched" target="_blank" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-file-pdf me-1"></i> Generate PDF Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-start gap-3">
+                <div class="card-icon icon-sky">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold mb-1">Outstanding Receivables by Customer</h5>
+                    <p class="text-muted small mb-3">Aging and breakdown of outstanding invoice amounts grouped by debtor client for treasury and collections.</p>
+                    <a href="/api/reports/pdf/outstanding" target="_blank" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-file-pdf me-1"></i> Generate PDF Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+            <div class="d-flex align-items-start gap-3">
+                <div class="card-icon icon-rose">
+                    <i class="bi bi-shield-exclamation"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold mb-1">Suspicious & Duplicate Transactions</h5>
+                    <p class="text-muted small mb-3">Audit report detailing overpayment warnings, duplicate statement transactions, and suspicious items flagged for compliance.</p>
+                    <a href="/api/reports/pdf/suspicious" target="_blank" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-file-pdf me-1"></i> Generate PDF Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

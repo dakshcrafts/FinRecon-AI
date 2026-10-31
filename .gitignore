@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+.venv/
+.venv_old/
+env/
+venv/
+ENV/
+
+# Pytest / Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases, secrets, backups
+*.bak
+*.db-wal
+*.db-shm
+secret.key
+gripher.lock
+uploads/
+generated_reports/
+backups/
+
+# VS Code / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
